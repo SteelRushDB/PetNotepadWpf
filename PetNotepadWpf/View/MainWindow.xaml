@@ -27,7 +27,16 @@
                 
             </MenuItem>
             <MenuItem Header="_Options">
-                
+                <MenuItem Header="AutoSave Interval">
+                    <MenuItem Header="Never" Click="AutoSaveInterval_Click" Tag="0"/>
+                    <MenuItem Header="5 Seconds" Click="AutoSaveInterval_Click" Tag="5"/>
+                    <MenuItem Header="2 Minutes" Click="AutoSaveInterval_Click" Tag="120"/>
+                    <MenuItem Header="5 Minutes" Click="AutoSaveInterval_Click" Tag="300"/>
+                    <MenuItem Header="10 Minutes" Click="AutoSaveInterval_Click" Tag="600"/>
+                    <MenuItem Header="20 Minutes" Click="AutoSaveInterval_Click" Tag="1200"/>
+                    <MenuItem Header="30 Minutes" Click="AutoSaveInterval_Click" Tag="1800"/>
+                    <MenuItem Header="1 Hour" Click="AutoSaveInterval_Click" Tag="3600"/>
+                </MenuItem>
             </MenuItem>
         </Menu>
 

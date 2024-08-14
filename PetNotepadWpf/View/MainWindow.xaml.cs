@@ -12,6 +12,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Windows.Markup;
+using System.Windows.Threading;
 using Microsoft.Win32;
 using Path = System.IO.Path;
 
@@ -33,14 +34,12 @@ public partial class MainWindow : Window
         this.Closing += Window_Closing;
     }
 
-    
-    private void AddTab(string header, string fileExtension)
+    private string CreateFileOnDesktop(string header, string fileExtension)
     {
-        // Создаем уникальное имя файла на основе заголовка вкладки
         string baseFileName = header + fileExtension;
         string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
         string filePath = Path.Combine(desktopPath, baseFileName);
-        
+    
         // Проверка на наличие файла с таким названием
         int counter = 1;
         while (File.Exists(filePath))
@@ -50,15 +49,19 @@ public partial class MainWindow : Window
             filePath = Path.Combine(desktopPath, newFileName);
             counter++;
         }
-        
+    
         using (FileStream fs = File.Create(filePath))
         {
             // Просто закрываем файл, чтобы он был создан
         }
-        
-        
+    
         File.SetAttributes(filePath, FileAttributes.Hidden);
-        
+    
+        return filePath;
+    }
+    private void AddTab(string header, string fileExtension)
+    {
+        string filePath = CreateFileOnDesktop(header, fileExtension);
         var newTab = new TabItemModel()
         {
             Header = header,
@@ -136,7 +139,7 @@ public partial class MainWindow : Window
         if (sender is RichTextBox thisRichTextBox)
         {
             var currentTab = Tabs.SelectedItem as TabItemModel;
-            if (currentTab != null && !string.IsNullOrEmpty(currentTab.FilePath))
+            if (currentTab != null)
             {
                 currentTab.Content = thisRichTextBox.Document;
                 Console.WriteLine("typed");
@@ -150,8 +153,19 @@ public partial class MainWindow : Window
         if (sender is TabControl tabControl && currentTab != null)
         {
             richTextBox.Document = currentTab.Content;
+            
+            AutoSaveTabContent(currentTab);
+            
+            if (_autoSaveTimer != null && _autoSaveTimer.IsEnabled)
+            {
+                _autoSaveTimer.Stop();
+                _autoSaveTimer.Start();
+            }
+            
             Console.WriteLine("changed");
         }
+
+        
     }
     
     
@@ -190,5 +204,71 @@ public partial class MainWindow : Window
         }
     }
     
+    //Auto-saving
+    private DispatcherTimer _autoSaveTimer;
+    private void StartAutoSave(int intervalInSeconds)
+    {
+        if (_autoSaveTimer == null)
+        {
+            _autoSaveTimer = new DispatcherTimer();
+            _autoSaveTimer.Tick += AutoSaveTab;
+        }
+        _autoSaveTimer.Interval = TimeSpan.FromSeconds(intervalInSeconds);
+        _autoSaveTimer.Start();
+    }
     
+    private void StopAutoSave()
+    {
+        _autoSaveTimer?.Stop();
+    }
+    private void AutoSaveTab(object sender, EventArgs e)
+    {
+        var currentTab = Tabs.SelectedItem as TabItemModel;
+        if (!string.IsNullOrEmpty(currentTab.FilePath))
+        {
+            AutoSaveTabContent(currentTab);
+        }
+    }
+    
+    private void AutoSaveTabContent(TabItemModel tab)
+    {
+        if (tab == null || string.IsNullOrEmpty(tab.FilePath)) return;
+
+        try
+        {
+            File.SetAttributes(tab.FilePath, FileAttributes.Normal);
+            
+            TextRange range = new TextRange(richTextBox.Document.ContentStart, richTextBox.Document.ContentEnd);
+            using (FileStream fileStream = new FileStream(tab.FilePath, FileMode.Create))
+            {
+                range.Save(fileStream, DataFormats.Rtf);
+            }
+            
+            File.SetAttributes(tab.FilePath, FileAttributes.Hidden);
+            
+            Console.WriteLine($"Content auto-saved to file: {tab.FilePath}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Error during auto-save: " + ex.Message);
+        }
+    }
+
+    private void AutoSaveInterval_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem menuItem && int.TryParse(menuItem.Tag.ToString(), out int interval))
+        {
+            if (interval == 0)
+            {
+                StopAutoSave();
+                MessageBox.Show("AutoSave disabled.");
+            }
+            else
+            {
+                StartAutoSave(interval);
+                MessageBox.Show($"AutoSave set to {interval / 60} minutes.");
+            }
+        }
+    }
+    //Auto-saving end
 }
