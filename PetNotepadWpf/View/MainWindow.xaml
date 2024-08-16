@@ -14,10 +14,7 @@
                     <MenuItem Header=".txt file" Click="AddTxtTab_Click"></MenuItem>
                     <MenuItem Header=".rtf file" Click="AddRtfTab_Click"></MenuItem>
                 </MenuItem>
-                <MenuItem Header="Open Project" >
-                    <MenuItem Header="WinForms"></MenuItem>
-                    <MenuItem Header="WPF" ></MenuItem>
-                </MenuItem>
+                <MenuItem Header="Open Project" Click="OpenFile_Click"></MenuItem>
                 <MenuItem Header="Save as..." Click="SaveFileAs_Click"></MenuItem>
             </MenuItem>
             <MenuItem Header="_Edit">

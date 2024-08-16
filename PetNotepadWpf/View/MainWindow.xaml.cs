@@ -25,23 +25,51 @@ namespace PetNotepadWpf;
 public partial class MainWindow : Window
 {
     private ObservableCollection<TabItemModel> _tabItems = new ObservableCollection<TabItemModel>();
+    private int TabCounter = 0;
     public MainWindow()
     {
         InitializeComponent();
         Tabs.ItemsSource = _tabItems;
-        AddTab("New tab", ".rtf");
+        AddTab("RTF tab", ".rtf");
         
         this.Closing += Window_Closing;
     }
 
+    private string CreateFolderOnDesktop(string header)
+    {
+        // Определяем путь к рабочему столу
+        string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+        
+        // Создаем уникальное имя для папки
+        string folderPath = Path.Combine(desktopPath, header);
+        int counter = 1;
+        
+        // Если папка с таким именем уже существует, добавляем суффикс с номером
+        while (Directory.Exists(folderPath))
+        {
+            folderPath = Path.Combine(desktopPath, $"{header}_{counter}");
+            counter++;
+        }
+        
+        // Создаем папку
+        Directory.CreateDirectory(folderPath);
+        File.SetAttributes(folderPath, FileAttributes.Hidden);
+        return folderPath;
+    }
+    // Сделать чтобы файл создавался в папке
     private string CreateFileOnDesktop(string header, string fileExtension)
     {
-        string baseFileName = header + fileExtension;
+        
+        // Определяем путь к рабочему столу
         string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+        // Создаём папку где будут версии документа
+        string folderPath = CreateFolderOnDesktop(header);
+        
+        string baseFileName = header + fileExtension;
         string filePath = Path.Combine(desktopPath, baseFileName);
     
-        // Проверка на наличие файла с таким названием
         int counter = 1;
+        // Проверка на наличие файла с таким названием
         while (File.Exists(filePath))
         {
             // Добавляем числовой суффикс к имени файла для уникальности
@@ -71,17 +99,18 @@ public partial class MainWindow : Window
             FileExtension = fileExtension
         };
         
-        Console.WriteLine($"Created FlowDocument for tab '{header}': {newTab.Content.GetHashCode()}");
+        Console.WriteLine($"Created FlowDocument for tab {header} {TabCounter}: {newTab.Content.GetHashCode()}");
         
         _tabItems.Add(newTab);
+        TabCounter++;
     }
     private void AddRtfTab_Click(object sender, RoutedEventArgs e)
     {
-        AddTab("New tab", ".rtf");
+        AddTab($"RTF tab {TabCounter}", ".rtf");
     }
     private void AddTxtTab_Click(object sender, RoutedEventArgs e)
     {
-        AddTab("New tab", ".txt");
+        AddTab($"TXT tab {TabCounter}", ".txt");
     }
     
     
@@ -113,17 +142,41 @@ public partial class MainWindow : Window
     }
     private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
     {
-        foreach (var tabItem in _tabItems)
+        Tabs.SelectedIndex = _tabItems.Count - 1;
+        for (int i = _tabItems.Count - 1; i >= 0; i--)
         {
+            var tabItem = _tabItems[i];
             if (File.Exists(tabItem.FilePath))
             {
                 try
                 {
+                    var result = MessageBox.Show($"Save changes in {tabItem.Header}?", "Save file", MessageBoxButton.YesNoCancel,
+                        MessageBoxImage.Question);
+                    
+                    // Спрашиваем у пользователя, хочет ли он сохранить изменения
+                    if (result == MessageBoxResult.Yes)
+                    {
+                        // Если пользователь хочет сохранить изменения
+                        if (!SaveFileAs()) // SaveFileAs возвращает false, если пользователь отменил сохранение
+                        {
+                            // Отмена закрытия окна
+                            e.Cancel = true;
+                            return;
+                        }
+                    }
+                    else if (result == MessageBoxResult.Cancel)
+                    {
+                        e.Cancel = true;
+                        return;
+                    }
+
                     // Снимаем атрибут скрытого файла
                     File.SetAttributes(tabItem.FilePath, FileAttributes.Normal);
 
                     // Удаляем файл без перемещения в корзину
                     File.Delete(tabItem.FilePath);
+
+                    _tabItems.Remove(tabItem);
                 }
                 catch (Exception ex)
                 {
@@ -185,7 +238,7 @@ public partial class MainWindow : Window
             }
         }
     }
-    private void SaveFileAs_Click (object sender, RoutedEventArgs e)
+    private bool SaveFileAs()
     {
         Microsoft.Win32.SaveFileDialog saveFileDialog = new Microsoft.Win32.SaveFileDialog();
         saveFileDialog.Filter = "Rich Text Format (*.rtf)|*.rtf|Text file (*.txt)|*.txt";
@@ -201,8 +254,58 @@ public partial class MainWindow : Window
             // Сохраняем текст в выбранном формате
             SaveRichTextBoxContent(saveFileDialog.FileName, format);
             MessageBox.Show("Текст сохранен в файл.");
+            return true;
+        }
+        
+        return false;
+    }
+    private void SaveFileAs_Click (object sender, RoutedEventArgs e)
+    {
+        SaveFileAs();
+    }
+
+    
+    private void LoadRichTextBoxContent(string filePath, string format)
+    {
+        TextRange range = new TextRange(richTextBox.Document.ContentStart, richTextBox.Document.ContentEnd);
+
+        using (FileStream fileStream = new FileStream(filePath, FileMode.Open))
+        {
+            if (format == ".rtf")
+            {
+                range.Load(fileStream, DataFormats.Rtf);
+            }
+            else if (format == ".txt")
+            {
+                range.Load(fileStream, DataFormats.Text);
+            }
         }
     }
+    private void OpenFile_Click(object sender, RoutedEventArgs e)
+    {
+        Microsoft.Win32.OpenFileDialog openFileDialog = new Microsoft.Win32.OpenFileDialog();
+        openFileDialog.Filter = "Rich Text Format (*.rtf)|*.rtf|Text file (*.txt)|*.txt";
+        openFileDialog.DefaultExt = "rtf";
+        openFileDialog.AddExtension = true;
+        if (openFileDialog.ShowDialog() == true)
+        {
+            string filePath = openFileDialog.FileName;
+
+            // Определяем формат файла (RTF или текст)
+            string fileExtension = System.IO.Path.GetExtension(filePath).ToLower();
+            try
+            {
+                LoadRichTextBoxContent(filePath, fileExtension);
+                MessageBox.Show("Text loaded successfully.");
+            }
+            catch (Exception exception)
+            {
+                Console.WriteLine(exception);
+                throw;
+            }
+        }
+    }
+    
     
     //Auto-saving
     private DispatcherTimer _autoSaveTimer;
