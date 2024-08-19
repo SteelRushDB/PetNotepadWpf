@@ -9,6 +9,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Windows.Markup;
@@ -31,6 +32,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         Tabs.ItemsSource = _tabItems;
         AddTab("RTF tab", ".rtf");
+        NewComandsAdd();
         
         this.Closing += Window_Closing;
     }
@@ -63,7 +65,7 @@ public partial class MainWindow : Window
         // Определяем путь к рабочему столу
         string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
         // Создаём папку где будут версии документа
-        string folderPath = CreateFolderOnDesktop(header);
+        //string folderPath = CreateFolderOnDesktop(header);
         
         string baseFileName = header + fileExtension;
         string filePath = Path.Combine(desktopPath, baseFileName);
@@ -116,27 +118,11 @@ public partial class MainWindow : Window
     
     private void CloseTab_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is Button closeButton) //сендер пытаемся привести к кнопке - и обзываем это клоузбатон, если тру
+        if (sender is Button closeButton) 
         {
-            if (closeButton.DataContext is TabItemModel tabItemModel) //смотрим которой табитем принадлежит кнопка - это табитем
+            if (closeButton.DataContext is TabItemModel tabItem)
             {
-                if (File.Exists(tabItemModel.FilePath))
-                {
-                    try
-                    {
-                        // Сначала снимаем атрибут скрытого файла
-                        File.SetAttributes(tabItemModel.FilePath, FileAttributes.Normal);
-                    
-                        // Удаляем файл без перемещения в корзину
-                        File.Delete(tabItemModel.FilePath);
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show($"Ошибка при удалении файла: {ex.Message}");
-                    }
-                }
-                
-                _tabItems.Remove(tabItemModel); //удаляем его из коллекции что автоматом видно в интерфейсе
+               ProcessTabItemClose(tabItem, false);
             }
         }
     }
@@ -146,42 +132,53 @@ public partial class MainWindow : Window
         for (int i = _tabItems.Count - 1; i >= 0; i--)
         {
             var tabItem = _tabItems[i];
-            if (File.Exists(tabItem.FilePath))
+            ProcessTabItemClose(tabItem, true, e);
+        }
+    }
+
+    private void ProcessTabItemClose(TabItemModel tabItem, bool shouldCancel, CancelEventArgs e = null)
+    {
+        if (File.Exists(tabItem.FilePath))
+        {
+            try
             {
-                try
-                {
-                    var result = MessageBox.Show($"Save changes in {tabItem.Header}?", "Save file", MessageBoxButton.YesNoCancel,
-                        MessageBoxImage.Question);
+                var result = MessageBox.Show($"Save changes in {tabItem.Header}?", "Save file", MessageBoxButton.YesNoCancel,
+                    MessageBoxImage.Question);
                     
-                    // Спрашиваем у пользователя, хочет ли он сохранить изменения
-                    if (result == MessageBoxResult.Yes)
+                // Спрашиваем у пользователя, хочет ли он сохранить изменения
+                if (result == MessageBoxResult.Yes)
+                {
+                    // Если пользователь хочет сохранить изменения
+                    if (!SaveFileAs()) // SaveFileAs возвращает false, если пользователь отменил сохранение
                     {
-                        // Если пользователь хочет сохранить изменения
-                        if (!SaveFileAs()) // SaveFileAs возвращает false, если пользователь отменил сохранение
+                        // Отмена закрытия окна
+                        if (shouldCancel && e != null)
                         {
-                            // Отмена закрытия окна
                             e.Cancel = true;
-                            return;
                         }
-                    }
-                    else if (result == MessageBoxResult.Cancel)
-                    {
-                        e.Cancel = true;
                         return;
                     }
-
-                    // Снимаем атрибут скрытого файла
-                    File.SetAttributes(tabItem.FilePath, FileAttributes.Normal);
-
-                    // Удаляем файл без перемещения в корзину
-                    File.Delete(tabItem.FilePath);
-
-                    _tabItems.Remove(tabItem);
                 }
-                catch (Exception ex)
+                else if (result == MessageBoxResult.Cancel)
                 {
-                    MessageBox.Show($"Ошибка при удалении файла: {ex.Message}");
+                    if (shouldCancel && e != null)
+                    {
+                        e.Cancel = true;
+                    }
+                    return;
                 }
+
+                // Снимаем атрибут скрытого файла
+                File.SetAttributes(tabItem.FilePath, FileAttributes.Normal);
+
+                // Удаляем файл без перемещения в корзину
+                File.Delete(tabItem.FilePath);
+
+                _tabItems.Remove(tabItem);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при удалении файла: {ex.Message}");
             }
         }
     }
@@ -374,4 +371,124 @@ public partial class MainWindow : Window
         }
     }
     //Auto-saving end
+    
+    
+    private void SelectAll_Click(object sender, RoutedEventArgs e)
+    {
+        richTextBox.SelectAll();
+    }
+    private void Cut_Click(object sender, RoutedEventArgs e)
+    {
+        richTextBox.Cut();
+    }
+    private void Copy_Click(object sender, RoutedEventArgs e)
+    {
+        richTextBox.Copy();
+    }
+    private void Paste_Click(object sender, RoutedEventArgs e)
+    {
+        richTextBox.Paste();
+    }
+    private void FormatText_Click(object sender, RoutedEventArgs e)
+    {
+        // Пример: изменение выделенного текста на жирный
+        TextSelection selectedText = richTextBox.Selection;
+        if (!selectedText.IsEmpty)
+        {
+            var currentWeight = selectedText.GetPropertyValue(TextElement.FontWeightProperty);
+            selectedText.ApplyPropertyValue(TextElement.FontWeightProperty,
+                currentWeight.Equals(FontWeights.Bold) ? FontWeights.Normal : FontWeights.Bold);
+        }
+    }
+
+
+    private void NewComandsAdd()
+    {
+        CommandBindings.Add(new CommandBinding(ApplicationCommands.New, NewDocumentCommand));
+        CommandBindings.Add(new CommandBinding(NewTabCommand, NewTabCommand_Executed));
+        CommandBindings.Add(new CommandBinding(ApplicationCommands.Save, SaveDocumentCommand));
+        CommandBindings.Add(new CommandBinding(SaveAllCommand, SaveAllDocumentsCommand));
+        CommandBindings.Add(new CommandBinding(ApplicationCommands.Close, CloseApplicationCommand));
+
+        // Связь команд с горячими клавишами
+        InputBindings.Add(new KeyBinding(ApplicationCommands.New, Key.N, ModifierKeys.Control));
+        InputBindings.Add(new KeyBinding(NewTabCommand, Key.T, ModifierKeys.Control));
+        InputBindings.Add(new KeyBinding(ApplicationCommands.Save, Key.S, ModifierKeys.Control));
+        InputBindings.Add(new KeyBinding(SaveAllCommand, Key.S, ModifierKeys.Control | ModifierKeys.Shift));
+        InputBindings.Add(new KeyBinding(ApplicationCommands.Close, Key.F4, ModifierKeys.Alt));
+    }
+    
+    // Команда создания документа в новом окне
+    private void NewDocumentCommand(object sender, ExecutedRoutedEventArgs e)
+    {
+        MainWindow newWindow = new MainWindow();
+        newWindow.Show();
+    }
+
+    // Команда создания документа в новой вкладке
+    private static RoutedCommand NewTabCommand = new RoutedCommand();
+    private void NewTabCommand_Executed(object sender, ExecutedRoutedEventArgs e)
+    {
+        AddTab("RTF tab", ".rtf"); // Метод AddTab нужно адаптировать для использования с горячими клавишами
+    }
+
+    // Команда сохранения текущего документа
+    private void SaveDocumentCommand(object sender, ExecutedRoutedEventArgs e)
+    {
+        SaveFileAs(); // Метод сохранения файла
+    }
+
+    // Команда сохранения всех открытых документов
+    private static RoutedCommand SaveAllCommand = new RoutedCommand();
+    private void SaveAllDocumentsCommand(object sender, ExecutedRoutedEventArgs e)
+    {
+        for (int i = _tabItems.Count - 1; i >= 0; i--)
+        {
+            Tabs.SelectedIndex = i;
+            SaveFileAs();
+        }
+    }
+
+    // Команда закрытия приложения
+    private void CloseApplicationCommand(object sender, ExecutedRoutedEventArgs e)
+    {
+        Close();
+    }
+    
+    
+    
+    private void ChangeTheme(string theme)
+    {
+            ResourceDictionary newTheme = new ResourceDictionary();
+
+            switch (theme)
+            {
+                case "Light":
+                    newTheme.Source = new Uri("pack://application:,,,/View/LightTheme.xaml");
+                    break;
+                case "Dark":
+                    newTheme.Source = new Uri("pack://application:,,,/View/DarkTheme.xaml");
+                    break;
+                default:
+                    throw new ArgumentException("Unknown theme", nameof(theme));
+            }
+
+            // Очищаем текущие ресурсы и добавляем новые
+            Application.Current.Resources.Clear();
+            Application.Current.Resources.MergedDictionaries.Add(newTheme);
+            
+            Application.Current.MainWindow?.UpdateLayout();
+            
+            
+            Console.WriteLine($"Theme changed to: {theme}");
+    }
+    private void LightTheme_Click(object sender, RoutedEventArgs e)
+    {
+        ChangeTheme("Light");
+    }
+
+    private void DarkTheme_Click(object sender, RoutedEventArgs e)
+    {
+        ChangeTheme("Dark");
+    }
 }

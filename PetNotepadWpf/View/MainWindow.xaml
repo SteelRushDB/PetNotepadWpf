@@ -8,7 +8,9 @@
         Title="MainWindow" Height="450" Width="800">
     
     <Grid>
-        <Menu VerticalAlignment="Top">
+        <Menu 
+            
+            VerticalAlignment="Top">
             <MenuItem Header="_File">
                 <MenuItem Header="New Project...">
                     <MenuItem Header=".txt file" Click="AddTxtTab_Click"></MenuItem>
@@ -24,6 +26,10 @@
                 
             </MenuItem>
             <MenuItem Header="_Options">
+                <MenuItem Header="Themes">
+                    <MenuItem Header="Light Theme" Click="LightTheme_Click"/>
+                    <MenuItem Header="Dark Theme" Click="DarkTheme_Click"/>
+                </MenuItem>
                 <MenuItem Header="AutoSave Interval">
                     <MenuItem Header="Never" Click="AutoSaveInterval_Click" Tag="0"/>
                     <MenuItem Header="5 Seconds" Click="AutoSaveInterval_Click" Tag="5"/>
@@ -34,6 +40,16 @@
                     <MenuItem Header="30 Minutes" Click="AutoSaveInterval_Click" Tag="1800"/>
                     <MenuItem Header="1 Hour" Click="AutoSaveInterval_Click" Tag="3600"/>
                 </MenuItem>
+            </MenuItem>
+            <MenuItem Header="_Help">
+                <TextBlock>
+                    Hotkeys: <LineBreak/>
+                    Ctrl+N - Creating a document in a new window; <LineBreak/>
+                    Ctrl+T - Creating a document in a new tab;<LineBreak/>
+                    Ctrl+S - Saving the current document;<LineBreak/>
+                    Ctrl+Shift+S - Saving all documents open in the window.<LineBreak/>
+                    Alt+F4 - Closing the application
+                </TextBlock>
             </MenuItem>
         </Menu>
 
@@ -64,6 +80,18 @@
                      VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
                      AcceptsTab="True" AcceptsReturn="True" Margin="0 48 0 0"
                      VerticalAlignment="Stretch" TextChanged="RichTextBox_OnTextChanged">
+            
+            <RichTextBox.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="Выбрать весь текст" Click="SelectAll_Click"/>
+                    <Separator />
+                    <MenuItem Header="Вырезать" Click="Cut_Click"/>
+                    <MenuItem Header="Копировать" Click="Copy_Click"/>
+                    <MenuItem Header="Вставить" Click="Paste_Click"/>
+                    <Separator />
+                    <MenuItem Header="Форматировать выделенный текст" Click="FormatText_Click"/>
+                </ContextMenu>
+            </RichTextBox.ContextMenu>
         </RichTextBox>
             
           

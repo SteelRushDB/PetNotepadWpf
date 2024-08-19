@@ -1,0 +1,27 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:local="clr-namespace:PetNotepadWpf">
+    
+    <Color x:Key="BackgroundColor">#FFFFFFFF</Color>
+    <Color x:Key="ForegroundColor">#FF000000</Color>
+    <SolidColorBrush x:Key="BackgroundBrush" Color="{StaticResource BackgroundColor}"/>
+    <SolidColorBrush x:Key="ForegroundBrush" Color="{StaticResource ForegroundColor}"/>
+    
+    <!-- Стиль для RichTextBox -->
+    <Style TargetType="RichTextBox">
+        <Setter Property="Background" Value="#FFFFFFFF"/>
+        <Setter Property="Foreground" Value="#FF000000"/>
+    </Style>
+
+    <!-- Стиль для TabControl -->
+    <Style TargetType="TabControl">
+        <Setter Property="Background" Value="#FFDDDDDD"/>
+        <Setter Property="Foreground" Value="#FF000000"/>
+    </Style>
+
+    <!-- Стиль для Menu -->
+    <Style TargetType="Menu">
+        <Setter Property="Background" Value="#FFEEEEEE"/>
+        <Setter Property="Foreground" Value="#FF000000"/>
+    </Style>
+</ResourceDictionary>
