@@ -24,4 +24,9 @@
         <Setter Property="Background" Value="#FFEEEEEE"/>
         <Setter Property="Foreground" Value="#FF000000"/>
     </Style>
+    
+    <Style TargetType="MenuItem">
+        <Setter Property="Background" Value="#FFEEEEEE"/>
+        <Setter Property="Foreground" Value="#FF000000"/>
+    </Style>
 </ResourceDictionary>

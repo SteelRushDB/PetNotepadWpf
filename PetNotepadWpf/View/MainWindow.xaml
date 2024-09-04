@@ -5,7 +5,8 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:PetNotepadWpf"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
+        Title="MainWindow" Height="450" Width="800"
+        >
     
     <Grid>
         <Menu 
@@ -23,22 +24,26 @@
                 
             </MenuItem>
             <MenuItem Header="_Format">
-                
+                <MenuItem Header="Bold" Click="Bold_Click"></MenuItem>
+                <MenuItem Header="Italic" Click="Italic_Click"></MenuItem>
+                <MenuItem Header="Underline" Click="Underline_Click"></MenuItem>
+                <MenuItem Header="Strikethrough" Click="Strikethrough_Click"></MenuItem>
             </MenuItem>
+            
             <MenuItem Header="_Options">
                 <MenuItem Header="Themes">
                     <MenuItem Header="Light Theme" Click="LightTheme_Click"/>
                     <MenuItem Header="Dark Theme" Click="DarkTheme_Click"/>
                 </MenuItem>
                 <MenuItem Header="AutoSave Interval">
-                    <MenuItem Header="Never" Click="AutoSaveInterval_Click" Tag="0"/>
-                    <MenuItem Header="5 Seconds" Click="AutoSaveInterval_Click" Tag="5"/>
-                    <MenuItem Header="2 Minutes" Click="AutoSaveInterval_Click" Tag="120"/>
-                    <MenuItem Header="5 Minutes" Click="AutoSaveInterval_Click" Tag="300"/>
-                    <MenuItem Header="10 Minutes" Click="AutoSaveInterval_Click" Tag="600"/>
-                    <MenuItem Header="20 Minutes" Click="AutoSaveInterval_Click" Tag="1200"/>
-                    <MenuItem Header="30 Minutes" Click="AutoSaveInterval_Click" Tag="1800"/>
-                    <MenuItem Header="1 Hour" Click="AutoSaveInterval_Click" Tag="3600"/>
+                    <MenuItem Header="Never" Click="AutoSaveInterval_Click" Tag="0" IsCheckable="True"/>
+                    <MenuItem Header="5 Seconds" Click="AutoSaveInterval_Click" Tag="5" IsCheckable="True"/>
+                    <MenuItem Header="2 Minutes" Click="AutoSaveInterval_Click" Tag="120" IsCheckable="True"/>
+                    <MenuItem Header="5 Minutes" Click="AutoSaveInterval_Click" Tag="300" IsCheckable="True"/>
+                    <MenuItem Header="10 Minutes" Click="AutoSaveInterval_Click" Tag="600" IsCheckable="True"/>
+                    <MenuItem Header="20 Minutes" Click="AutoSaveInterval_Click" Tag="1200" IsCheckable="True"/>
+                    <MenuItem Header="30 Minutes" Click="AutoSaveInterval_Click" Tag="1800" IsCheckable="True"/>
+                    <MenuItem Header="1 Hour" Click="AutoSaveInterval_Click" Tag="3600" IsCheckable="True"/>
                 </MenuItem>
             </MenuItem>
             <MenuItem Header="_Help">

@@ -25,13 +25,21 @@ namespace PetNotepadWpf;
 /// </summary>
 public partial class MainWindow : Window
 {
+    private SettingsManager _settingsManager;
+    
     private ObservableCollection<TabItemModel> _tabItems = new ObservableCollection<TabItemModel>();
     private int TabCounter = 0;
     public MainWindow()
     {
         InitializeComponent();
         Tabs.ItemsSource = _tabItems;
-        AddTab("RTF tab", ".rtf");
+        AddTab($"RTF tab {TabCounter}", ".rtf");
+        
+        _settingsManager = new SettingsManager();
+        _settingsManager.LoadSettings();  // Загружаем настройки при старте приложения
+        ApplySettings();  // Применяем загруженные настройки
+        _settingsManager.Settings.OpenFiles.Clear();
+        
         NewComandsAdd();
         
         this.Closing += Window_Closing;
@@ -58,17 +66,12 @@ public partial class MainWindow : Window
         File.SetAttributes(folderPath, FileAttributes.Hidden);
         return folderPath;
     }
-    // Сделать чтобы файл создавался в папке
     private string CreateFileOnDesktop(string header, string fileExtension)
     {
-        
-        // Определяем путь к рабочему столу
-        string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-        // Создаём папку где будут версии документа
-        //string folderPath = CreateFolderOnDesktop(header);
+        string folderPath = CreateFolderOnDesktop(header);
         
         string baseFileName = header + fileExtension;
-        string filePath = Path.Combine(desktopPath, baseFileName);
+        string filePath = Path.Combine(folderPath, baseFileName);
     
         int counter = 1;
         // Проверка на наличие файла с таким названием
@@ -76,7 +79,7 @@ public partial class MainWindow : Window
         {
             // Добавляем числовой суффикс к имени файла для уникальности
             string newFileName = $"{header}_{counter}.{fileExtension}";
-            filePath = Path.Combine(desktopPath, newFileName);
+            filePath = Path.Combine(folderPath, newFileName);
             counter++;
         }
     
@@ -104,6 +107,8 @@ public partial class MainWindow : Window
         Console.WriteLine($"Created FlowDocument for tab {header} {TabCounter}: {newTab.Content.GetHashCode()}");
         
         _tabItems.Add(newTab);
+        Tabs.SelectedItem = newTab;
+        
         TabCounter++;
     }
     private void AddRtfTab_Click(object sender, RoutedEventArgs e)
@@ -138,7 +143,8 @@ public partial class MainWindow : Window
 
     private void ProcessTabItemClose(TabItemModel tabItem, bool shouldCancel, CancelEventArgs e = null)
     {
-        if (File.Exists(tabItem.FilePath))
+        string directoryPath = Path.GetDirectoryName(tabItem.FilePath);
+        if (Directory.Exists(directoryPath))
         {
             try
             {
@@ -169,10 +175,10 @@ public partial class MainWindow : Window
                 }
 
                 // Снимаем атрибут скрытого файла
-                File.SetAttributes(tabItem.FilePath, FileAttributes.Normal);
+                File.SetAttributes(directoryPath, FileAttributes.Normal);
 
-                // Удаляем файл без перемещения в корзину
-                File.Delete(tabItem.FilePath);
+                // Удаляем папку и всё внутри
+                Directory.Delete(directoryPath, true);
 
                 _tabItems.Remove(tabItem);
             }
@@ -180,6 +186,10 @@ public partial class MainWindow : Window
             {
                 MessageBox.Show($"Ошибка при удалении файла: {ex.Message}");
             }
+        }
+        else
+        {
+            Console.WriteLine("error");
         }
     }
     
@@ -204,7 +214,7 @@ public partial class MainWindow : Window
         {
             richTextBox.Document = currentTab.Content;
             
-            AutoSaveTabContent(currentTab);
+            //AutoSaveTabContent(currentTab); //Почему это тут, а не до этого???
             
             if (_autoSaveTimer != null && _autoSaveTimer.IsEnabled)
             {
@@ -293,6 +303,14 @@ public partial class MainWindow : Window
             try
             {
                 LoadRichTextBoxContent(filePath, fileExtension);
+                
+                _settingsManager.Settings.OpenFiles.Add(new OpenFileInfo
+                {
+                    FilePath = filePath,
+                    FileExtension = fileExtension
+                });
+                _settingsManager.SaveSettings();
+                
                 MessageBox.Show("Text loaded successfully.");
             }
             catch (Exception exception)
@@ -316,7 +334,6 @@ public partial class MainWindow : Window
         _autoSaveTimer.Interval = TimeSpan.FromSeconds(intervalInSeconds);
         _autoSaveTimer.Start();
     }
-    
     private void StopAutoSave()
     {
         _autoSaveTimer?.Stop();
@@ -329,45 +346,102 @@ public partial class MainWindow : Window
             AutoSaveTabContent(currentTab);
         }
     }
-    
     private void AutoSaveTabContent(TabItemModel tab)
     {
         if (tab == null || string.IsNullOrEmpty(tab.FilePath)) return;
-
         try
         {
+            string directory = Path.GetDirectoryName(tab.FilePath);
+            string fileNameWithoutExtension = Path.GetFileNameWithoutExtension(tab.FilePath);
+            string extension = Path.GetExtension(tab.FilePath);
+        
+            // Используем регулярное выражение для удаления старой временной метки (формат _HHmmss)
+            string pattern = @"_\d{6}$";
+            fileNameWithoutExtension = System.Text.RegularExpressions.Regex.Replace(fileNameWithoutExtension, pattern, "");
+
+            // Добавляем новую временную метку
+            string timestamp = DateTime.Now.ToString("HHmmss");
+            string newFileName = $"{fileNameWithoutExtension}_{timestamp}{extension}";
+            string newSavePath = Path.Combine(directory, newFileName);
+            
+            
             File.SetAttributes(tab.FilePath, FileAttributes.Normal);
             
             TextRange range = new TextRange(richTextBox.Document.ContentStart, richTextBox.Document.ContentEnd);
-            using (FileStream fileStream = new FileStream(tab.FilePath, FileMode.Create))
+            
+            using (FileStream fileStream = new FileStream(newSavePath, FileMode.Create))
             {
                 range.Save(fileStream, DataFormats.Rtf);
             }
-            
+
             File.SetAttributes(tab.FilePath, FileAttributes.Hidden);
             
-            Console.WriteLine($"Content auto-saved to file: {tab.FilePath}");
+            tab.FilePath = newSavePath;
+            
+            Console.WriteLine($"Content auto-saved to file: {newSavePath}");
+            
+            CleanUpOldFiles(directory, fileNameWithoutExtension, extension, 5);
         }
         catch (Exception ex)
         {
             Console.WriteLine("Error during auto-save: " + ex.Message);
         }
     }
-
     private void AutoSaveInterval_Click(object sender, RoutedEventArgs e)
     {
         if (sender is MenuItem menuItem && int.TryParse(menuItem.Tag.ToString(), out int interval))
         {
+            // Сброс всех других пунктов меню
+            foreach (MenuItem item in ((MenuItem)menuItem.Parent).Items)
+            {
+                item.IsChecked = false;
+            }
+            // Отмечаем выбранный пункт
+            menuItem.IsChecked = true;
+            
+            
             if (interval == 0)
             {
                 StopAutoSave();
                 MessageBox.Show("AutoSave disabled.");
+                
+                _settingsManager.Settings.IsAutoSaveEnabled = false;
+                _settingsManager.Settings.AutoSaveInterval = interval;
+                _settingsManager.SaveSettings();
             }
             else
             {
                 StartAutoSave(interval);
                 MessageBox.Show($"AutoSave set to {interval / 60} minutes.");
+                
+                _settingsManager.Settings.IsAutoSaveEnabled = true;
+                _settingsManager.Settings.AutoSaveInterval = interval;
+                _settingsManager.SaveSettings();
             }
+            
+        }
+    }
+    private void CleanUpOldFiles(string directory, string fileNameWithoutExtension, string extension, int maxFiles)
+    {
+        try
+        {
+            // Получаем все файлы в папке с похожим именем и нужным расширением
+            var files = Directory.GetFiles(directory, $"{fileNameWithoutExtension}_*{extension}")
+                .OrderBy(File.GetCreationTime) // Сортируем файлы по времени создания
+                .ToList();
+
+            // Если количество файлов превышает максимальное допустимое, удаляем старые файлы
+            while (files.Count > maxFiles)
+            {
+                string oldestFile = files.First();
+                File.SetAttributes(oldestFile, FileAttributes.Normal); // Сбрасываем атрибуты
+                File.Delete(oldestFile); // Удаляем старый файл
+                files.RemoveAt(0); // Убираем его из списка
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Error during cleanup: " + ex.Message);
         }
     }
     //Auto-saving end
@@ -481,14 +555,120 @@ public partial class MainWindow : Window
             
             
             Console.WriteLine($"Theme changed to: {theme}");
+            
+            // Сохраняем тему
+            _settingsManager.Settings.Theme = theme;
+            _settingsManager.SaveSettings();
     }
     private void LightTheme_Click(object sender, RoutedEventArgs e)
     {
         ChangeTheme("Light");
     }
-
     private void DarkTheme_Click(object sender, RoutedEventArgs e)
     {
         ChangeTheme("Dark");
     }
+    
+    
+    
+    private void Bold_Click(object sender, RoutedEventArgs e)
+    {
+        // Получаем выделенный текст
+        TextSelection selectedText = richTextBox.Selection;
+
+        // Если текст уже жирный, снимаем форматирование
+        if (selectedText.GetPropertyValue(TextElement.FontWeightProperty).Equals(FontWeights.Bold))
+        {
+            selectedText.ApplyPropertyValue(TextElement.FontWeightProperty, FontWeights.Normal);
+        }
+        else
+        {
+            // Применяем жирное начертание
+            selectedText.ApplyPropertyValue(TextElement.FontWeightProperty, FontWeights.Bold);
+        }
+    }
+    private void Italic_Click(object sender, RoutedEventArgs e)
+        {
+            // Получаем выделенный текст
+            TextSelection selectedText = richTextBox.Selection;
+
+            // Если текст уже курсивный, снимаем форматирование
+            if (selectedText.GetPropertyValue(TextElement.FontStyleProperty).Equals(FontStyles.Italic))
+            {
+                selectedText.ApplyPropertyValue(TextElement.FontStyleProperty, FontStyles.Normal);
+            }
+            else
+            {
+                // Применяем курсив
+                selectedText.ApplyPropertyValue(TextElement.FontStyleProperty, FontStyles.Italic);
+            }
+        }
+    
+    private void Underline_Click(object sender, RoutedEventArgs e)
+    {
+        TextSelection selectedText = richTextBox.Selection;
+        SetDecorations(selectedText, TextDecorations.Underline);
+    }
+    private void Strikethrough_Click(object sender, RoutedEventArgs e)
+    {
+        TextSelection selectedText = richTextBox.Selection;
+        SetDecorations(selectedText, TextDecorations.Strikethrough);
+    }
+
+    private static void SetDecorations(TextRange selectedText, TextDecorationCollection newDecoration)
+    {
+        var decorations = selectedText.GetPropertyValue(Inline.TextDecorationsProperty) as TextDecorationCollection
+                          ?? new TextDecorationCollection();
+
+        decorations = decorations.Contains(newDecoration.First())
+            ? new TextDecorationCollection(decorations.Except(newDecoration))
+            : new TextDecorationCollection(decorations.Union(newDecoration));
+
+        selectedText.ApplyPropertyValue(Inline.TextDecorationsProperty, decorations);
+    }
+
+    
+    
+    private void ApplySettings()
+    {
+        this.Width = _settingsManager.Settings.WindowWidth;
+        this.Height = _settingsManager.Settings.WindowHeight;
+        ChangeTheme(_settingsManager.Settings.Theme);
+
+        if (_settingsManager.Settings.IsAutoSaveEnabled)
+        {
+            // Логика включения автосохранения
+            StartAutoSave(_settingsManager.Settings.AutoSaveInterval);
+        }
+        
+        // Восстанавливаем открытые файлы
+        foreach (var fileInfo in _settingsManager.Settings.OpenFiles)
+        {
+            if (File.Exists(fileInfo.FilePath))
+            {
+                // Восстанавливаем вкладку с соответствующим файлом
+                AddTab_Existed($"Tab {TabCounter}", fileInfo.FileExtension, fileInfo.FilePath);
+            }
+        }
+    }
+    
+    // Сохранение настроек при закрытии приложения
+    protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+    {
+        _settingsManager.Settings.WindowWidth = this.Width;
+        _settingsManager.Settings.WindowHeight = this.Height;
+        
+        _settingsManager.SaveSettings();  // Сохраняем настройки перед закрытием приложения
+        base.OnClosing(e);
+    }
+
+    // Метод для добавления вкладки открытого в предыдущей сессии файла
+    private void AddTab_Existed(string header, string fileExtension, string filePath = null)
+    {
+        AddTab($"Tab {TabCounter}", fileExtension);
+        LoadRichTextBoxContent(filePath, fileExtension);
+
+    }
+
+    
 }
